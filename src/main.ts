@@ -1,5 +1,4 @@
-import { levelOneDeal } from "./level-one-deal";
-import { startWithDeal, type Session, type TileSnapshot } from "./session";
+import { startLevel, type Session, type TileSnapshot } from "./session";
 import { faceName, tileFaceSvg } from "./tile-face";
 import "./style.css";
 
@@ -9,7 +8,7 @@ if (!(appElement instanceof HTMLElement)) {
 }
 const app: HTMLElement = appElement;
 
-let session: Session = startWithDeal(levelOneDeal);
+let session: Session = startLevel(1);
 
 function tilt(id: string): number {
   let hash = 0;
@@ -60,7 +59,7 @@ function render(): void {
     again.type = "button";
     again.textContent = "再来一局";
     again.addEventListener("click", () => {
-      session = startWithDeal(levelOneDeal);
+      session = startLevel(1);
       render();
     });
     card.append(message, again);

@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { startWithDeal } from "./session";
+import { startLevel, startWithDeal } from "./session";
 import type { DealTile, Face } from "./session";
 
 const tong1: Face = { suit: "tong", rank: 1 };
@@ -153,4 +153,84 @@ test("clearing the board and tray is a win", () => {
   expect(snap.status).toBe("won");
   expect(snap.tiles).toEqual([]);
   expect(snap.tray).toEqual([]);
+});
+
+function faceKey(face: Face): string {
+  return `${face.suit}-${face.rank}`;
+}
+
+function layoutOf(session: ReturnType<typeof startLevel>) {
+  return session
+    .snapshot()
+    .tiles.map((tile) => ({
+      id: tile.id,
+      face: tile.face,
+      rect: tile.rect,
+      z: tile.z,
+    }))
+    .sort((a, b) => a.id.localeCompare(b.id));
+}
+
+function canWinFrom(deal: DealTile[]): boolean {
+  function search(picks: string[]): boolean {
+    const session = startWithDeal(deal);
+    for (const id of picks) {
+      if (!session.pick(id)) {
+        return false;
+      }
+    }
+    const snap = session.snapshot();
+    if (snap.status === "won") {
+      return true;
+    }
+    if (snap.status === "lost") {
+      return false;
+    }
+    for (const tile of snap.tiles.filter((item) => item.free)) {
+      if (search([...picks, tile.id])) {
+        return true;
+      }
+    }
+    return false;
+  }
+  return search([]);
+}
+
+test("level 1 deals three of each tong 1-6", () => {
+  const tiles = startLevel(1).snapshot().tiles;
+  expect(tiles).toHaveLength(18);
+
+  const counts = new Map<string, number>();
+  for (const tile of tiles) {
+    const key = faceKey(tile.face);
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  expect([...counts.entries()].sort()).toEqual([
+    ["tong-1", 3],
+    ["tong-2", 3],
+    ["tong-3", 3],
+    ["tong-4", 3],
+    ["tong-5", 3],
+    ["tong-6", 3],
+  ]);
+});
+
+test("level 1 uses a fixed seed", () => {
+  expect(layoutOf(startLevel(1))).toEqual(layoutOf(startLevel(1)));
+});
+
+test("level 1 starts with at least four free tiles and is solvable", () => {
+  const session = startLevel(1);
+  const snap = session.snapshot();
+  expect(snap.tiles.filter((tile) => tile.free).length).toBeGreaterThanOrEqual(4);
+  expect(canWinFrom(snap.tiles)).toBe(true);
+});
+
+test("level 1 tiles sit between the hud and the tray", () => {
+  for (const tile of startLevel(1).snapshot().tiles) {
+    expect(tile.rect.x).toBeGreaterThanOrEqual(16);
+    expect(tile.rect.y).toBeGreaterThanOrEqual(64);
+    expect(tile.rect.x + tile.rect.width).toBeLessThanOrEqual(344);
+    expect(tile.rect.y + tile.rect.height).toBeLessThanOrEqual(344);
+  }
 });
