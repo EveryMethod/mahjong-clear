@@ -41,12 +41,21 @@ body {
   padding: 4px 6px 10px;
 }
 
-.hud h1 {
+.hud h1,
+.title-btn {
   margin: 0;
   font-size: 28px;
   letter-spacing: 0.18em;
   font-weight: 600;
   color: var(--gold);
+  font-family: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+}
+
+.title-btn {
+  cursor: pointer;
 }
 
 .hud .level {
@@ -160,4 +169,100 @@ body {
   background: #fff;
   color: var(--ink);
   cursor: pointer;
+}
+
+.overlay-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+}
+
+.result-detail {
+  margin: -8px 0 16px;
+  letter-spacing: 0.12em;
+}
+
+.tutorial-card ul {
+  margin: 0 0 16px;
+  padding: 0;
+  list-style: none;
+  text-align: left;
+  font-size: 16px;
+  letter-spacing: 0;
+  line-height: 1.7;
+}
+
+.tutorial-card p {
+  font-size: 24px;
+}
+
+.tools {
+  display: flex;
+  gap: 6px;
+  padding: 0 4px 8px;
+}
+
+.tool {
+  flex: 1;
+  font: inherit;
+  font-size: 13px;
+  padding: 6px 4px;
+  border-radius: 999px;
+  border: 1px solid rgba(232, 213, 163, 0.45);
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--cream);
+  cursor: pointer;
+}
+
+.tool:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.select-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  padding: 8px 4px 16px;
+}
+
+.level-card {
+  font: inherit;
+  color: var(--cream);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(232, 213, 163, 0.35);
+  border-radius: 14px;
+  padding: 16px 8px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 76px;
+}
+
+.level-card strong {
+  font-size: 22px;
+}
+
+.level-card span {
+  color: var(--gold);
+  min-height: 1em;
+}
+
+.level-card.is-locked {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.ending {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ending-card span {
+  display: block;
+  margin: -8px 0 16px;
 }

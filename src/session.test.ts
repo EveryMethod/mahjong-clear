@@ -171,14 +171,8 @@ function layoutOf(session: ReturnType<typeof startLevel>) {
     .sort((a, b) => a.id.localeCompare(b.id));
 }
 
-function canWinFrom(deal: DealTile[]): boolean {
-  function search(picks: string[]): boolean {
-    const session = startWithDeal(deal);
-    for (const id of picks) {
-      if (!session.pick(id)) {
-        return false;
-      }
-    }
+function winByHighestZ(session: ReturnType<typeof startWithDeal>): boolean {
+  for (;;) {
     const snap = session.snapshot();
     if (snap.status === "won") {
       return true;
@@ -186,14 +180,26 @@ function canWinFrom(deal: DealTile[]): boolean {
     if (snap.status === "lost") {
       return false;
     }
-    for (const tile of snap.tiles.filter((item) => item.free)) {
-      if (search([...picks, tile.id])) {
-        return true;
-      }
+    const free = snap.tiles
+      .filter((tile) => tile.free)
+      .sort((a, b) => b.z - a.z);
+    if (free.length === 0 || !session.pick(free[0].id)) {
+      return false;
     }
-    return false;
   }
-  return search([]);
+}
+
+function canWinFrom(deal: DealTile[]): boolean {
+  return winByHighestZ(startWithDeal(deal));
+}
+
+function countsOf(tiles: { face: Face }[]): [string, number][] {
+  const counts = new Map<string, number>();
+  for (const tile of tiles) {
+    const key = faceKey(tile.face);
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  return [...counts.entries()].sort();
 }
 
 test("level 1 deals three of each tong 1-6", () => {
@@ -233,4 +239,146 @@ test("level 1 tiles sit between the hud and the tray", () => {
     expect(tile.rect.x + tile.rect.width).toBeLessThanOrEqual(344);
     expect(tile.rect.y + tile.rect.height).toBeLessThanOrEqual(344);
   }
+});
+
+test("undo is unavailable at the start of a round", () => {
+  const session = startLevel(1);
+  expect(session.snapshot().canUndo).toBe(false);
+  expect(session.undo()).toBe(false);
+});
+
+test("undo restores the previous hand including a match", () => {
+  const session = startWithDeal([
+    freeTile("a1", tong1, 0),
+    freeTile("a2", tong1, 20),
+    freeTile("a3", tong1, 40),
+    freeTile("b1", tong2, 60),
+  ]);
+  session.pick("a1");
+  session.pick("a2");
+  session.pick("a3");
+  expect(session.snapshot().tray).toEqual([]);
+  expect(session.undo()).toBe(true);
+  expect(session.snapshot().tray).toEqual([
+    { id: "a1", face: tong1 },
+    { id: "a2", face: tong1 },
+  ]);
+  expect(session.snapshot().undosLeft).toBe(2);
+});
+
+test("undo is limited to three uses", () => {
+  const session = startWithDeal([
+    freeTile("a1", tong1, 0),
+    freeTile("a2", tong1, 20),
+    freeTile("b1", tong2, 40),
+    freeTile("b2", tong2, 60),
+    freeTile("c1", tong3, 80),
+  ]);
+  session.pick("a1");
+  session.pick("a2");
+  session.pick("b1");
+  session.pick("b2");
+  expect(session.undo()).toBe(true);
+  expect(session.undo()).toBe(true);
+  expect(session.undo()).toBe(true);
+  expect(session.undo()).toBe(false);
+  expect(session.snapshot().undosLeft).toBe(0);
+});
+
+test("restart restores the same deal and refills tools", () => {
+  const first = layoutOf(startLevel(1));
+  const session = startLevel(1);
+  const free = session.snapshot().tiles.find((tile) => tile.free);
+  expect(free).toBeDefined();
+  session.pick(free!.id);
+  session.undo();
+  session.restart();
+  const snap = session.snapshot();
+  expect(layoutOf(session)).toEqual(first);
+  expect(snap.undosLeft).toBe(3);
+  expect(snap.shufflesLeft).toBe(1);
+  expect(snap.tray).toEqual([]);
+});
+
+test("shuffle keeps the tray and remains solvable", () => {
+  const session = startLevel(1);
+  const free = session.snapshot().tiles.find((tile) => tile.free);
+  expect(free).toBeDefined();
+  session.pick(free!.id);
+  const tray = session.snapshot().tray;
+  const remaining = session.snapshot().tiles.length;
+  expect(session.shuffle()).toBe(true);
+  const snap = session.snapshot();
+  expect(snap.tray).toEqual(tray);
+  expect(snap.tiles).toHaveLength(remaining);
+  expect(snap.shufflesLeft).toBe(0);
+  expect(session.shuffle()).toBe(false);
+  expect(winByHighestZ(session)).toBe(true);
+});
+
+test("a perfect clear is three stars", () => {
+  const session = startWithDeal([
+    freeTile("a1", tong1, 0),
+    freeTile("a2", tong1, 20),
+    freeTile("a3", tong1, 40),
+  ]);
+  session.pick("a1");
+  session.pick("a2");
+  session.pick("a3");
+  const snap = session.snapshot();
+  expect(snap.stars).toBe(3);
+  expect(snap.score).toBe(450);
+});
+
+test("using undo without shuffle is two stars", () => {
+  const session = startWithDeal([
+    freeTile("a1", tong1, 0),
+    freeTile("a2", tong1, 20),
+    freeTile("a3", tong1, 40),
+  ]);
+  session.pick("a1");
+  session.undo();
+  session.pick("a1");
+  session.pick("a2");
+  session.pick("a3");
+  expect(session.snapshot().stars).toBe(2);
+  expect(session.snapshot().score).toBe(400);
+});
+
+test("using shuffle is one star", () => {
+  const session = startLevel(1);
+  expect(session.shuffle()).toBe(true);
+  expect(winByHighestZ(session)).toBe(true);
+  expect(session.snapshot().stars).toBe(1);
+  expect(session.snapshot().score).toBe(6 * 100 + 3 * 50);
+});
+
+test("level 4 deals nine tong faces", () => {
+  const tiles = startLevel(4).snapshot().tiles;
+  expect(tiles).toHaveLength(27);
+  expect(tiles.every((tile) => tile.face.suit === "tong")).toBe(true);
+  expect(countsOf(tiles).every(([, count]) => count === 3)).toBe(true);
+  expect(countsOf(tiles)).toHaveLength(9);
+  expect(winByHighestZ(startLevel(4))).toBe(true);
+});
+
+test("level 5 introduces tiao", () => {
+  const tiles = startLevel(5).snapshot().tiles;
+  expect(tiles).toHaveLength(30);
+  expect(countsOf(tiles)).toHaveLength(10);
+  expect(countsOf(tiles).every(([, count]) => count === 3)).toBe(true);
+  expect(tiles.some((tile) => tile.face.suit === "tiao" && tile.face.rank === 1)).toBe(
+    true,
+  );
+  expect(winByHighestZ(startLevel(5))).toBe(true);
+});
+
+test("level 12 deals 18 types and no wan", () => {
+  const tiles = startLevel(12).snapshot().tiles;
+  expect(tiles).toHaveLength(54);
+  expect(countsOf(tiles)).toHaveLength(18);
+  expect(countsOf(tiles).every(([, count]) => count === 3)).toBe(true);
+  expect(tiles.some((tile) => tile.face.suit === "wan")).toBe(false);
+  expect(tiles.filter((tile) => tile.free).length).toBeGreaterThanOrEqual(1);
+  expect(winByHighestZ(startLevel(12))).toBe(true);
 });
